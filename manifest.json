@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "GF Code: Site to Markdown",
   "version": "1.0.0",
-  "description": "GF Code: Site to Markdown",
+  "description": "Browser extension to extract website content into clean markdown optimized for LLMs",
 
   "permissions": [
     "storage",
@@ -21,7 +21,7 @@
 
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "Minha Extensão"
+    "default_title": "GF Code: Site to Markdown"
   },
 
   "content_scripts": [
