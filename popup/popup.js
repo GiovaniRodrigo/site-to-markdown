@@ -1,18 +1,26 @@
 // State object matching the ExtractionJob data model
 const state = {
   tabId: null,
-  status: 'idle', // 'idle' | 'extracting' | 'completed' | 'error'
+  status: 'idle', // 'idle' | 'extracting' | 'completed' | 'error' | 'crawling'
   error: null,
   activeTab: null,
   settings: {
     singleFile: true,
     charLimit: 4000,
     similarityThreshold: 0.85
+  },
+  crawler: {
+    urls: [],
+    currentIndex: 0,
+    results: [],
+    abortController: null
   }
 };
 
 // UI Element references
 let extractBtn;
+let scanBtn;
+let cancelBtn;
 let statusEl;
 let errorEl;
 let tabTitleEl;
@@ -28,6 +36,8 @@ let limitGroup;
 document.addEventListener('DOMContentLoaded', async () => {
   // Select DOM Elements
   extractBtn = document.getElementById('extract-btn');
+  scanBtn = document.getElementById('scan-btn');
+  cancelBtn = document.getElementById('cancel-btn');
   statusEl = document.getElementById('status-msg');
   errorEl = document.getElementById('error-banner');
   tabTitleEl = document.getElementById('tab-title-display');
@@ -79,6 +89,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     extractBtn.addEventListener('click', startExtraction);
   }
 
+  if (scanBtn) {
+    scanBtn.addEventListener('click', startDirectoryScan);
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', cancelDirectoryScan);
+  }
+
   // Fetch current active tab and validate
   await checkActiveTab();
   updateUI();
@@ -98,7 +116,6 @@ function updateSettingsUI() {
   toggleLimitGroup();
 }
 
-// Show/hide chunk limit input based on single/multi-file mode
 function toggleLimitGroup() {
   if (limitGroup) {
     limitGroup.style.display = state.settings.singleFile ? 'none' : 'flex';
@@ -106,7 +123,6 @@ function toggleLimitGroup() {
 }
 
 // Save settings to Chrome Storage
-// For Phase 4 compatibility: does not fail if storage API is unavailable
 function saveSettings() {
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
     chrome.storage.local.set({
@@ -147,6 +163,7 @@ async function checkActiveTab() {
     if (isRestricted) {
       setErrorState('Cannot extract content from browser privileged pages.');
       if (extractBtn) extractBtn.disabled = true;
+      if (scanBtn) scanBtn.disabled = true;
     }
   } catch (err) {
     setErrorState('Error querying active tab: ' + err.message);
@@ -315,7 +332,7 @@ function splitMarkdown(markdown, limit) {
   for (let paragraph of paragraphs) {
     const pLength = paragraph.length;
 
-    // If a paragraph is longer than the limit, split it by sentences
+    // If a single paragraph is longer than the limit, split it by sentences or lines
     if (pLength > limit) {
       if (currentChunk.length > 0) {
         chunks.push(currentChunk.join('\n\n'));
@@ -323,6 +340,7 @@ function splitMarkdown(markdown, limit) {
         currentLength = 0;
       }
       
+      // Split paragraph by sentences (approximate)
       const sentences = paragraph.match(/[^.!?]+[.!?]+(\s|$)/g) || [paragraph];
       let subChunk = [];
       let subLength = 0;
@@ -372,6 +390,7 @@ function triggerDownload(content, filename, mimeType) {
       filename: filename,
       saveAs: true
     }, (downloadId) => {
+      // Revoke the URL object
       setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
 
       if (chrome.runtime.lastError) {
@@ -415,6 +434,12 @@ function updateUI() {
       extractBtn.disabled = isRestricted;
       extractBtn.textContent = 'Start Extraction';
       extractBtn.classList.remove('loading', 'success', 'error-state');
+      if (scanBtn) {
+        scanBtn.disabled = isRestricted;
+        scanBtn.textContent = 'Scan Directory';
+        scanBtn.classList.remove('loading', 'success', 'error-state');
+      }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Ready to extract';
       errorEl.style.display = 'none';
       break;
@@ -424,7 +449,25 @@ function updateUI() {
       extractBtn.textContent = 'Extracting...';
       extractBtn.classList.add('loading');
       extractBtn.classList.remove('success', 'error-state');
+      if (scanBtn) scanBtn.disabled = true;
+      if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Parsing page content...';
+      errorEl.style.display = 'none';
+      break;
+
+    case 'crawling':
+      extractBtn.disabled = true;
+      if (scanBtn) {
+        scanBtn.disabled = true;
+        scanBtn.textContent = 'Scanning...';
+        scanBtn.classList.add('loading');
+      }
+      if (cancelBtn) cancelBtn.style.display = 'inline-block';
+      if (state.crawler.urls.length > 0) {
+        statusEl.textContent = `Crawled ${state.crawler.currentIndex} of ${state.crawler.urls.length} pages...`;
+      } else {
+        statusEl.textContent = 'Extracting links...';
+      }
       errorEl.style.display = 'none';
       break;
 
@@ -433,9 +476,17 @@ function updateUI() {
       extractBtn.textContent = 'Success!';
       extractBtn.classList.add('success');
       extractBtn.classList.remove('loading', 'error-state');
+      if (scanBtn) {
+        scanBtn.disabled = isRestricted;
+        scanBtn.textContent = 'Success!';
+        scanBtn.classList.add('success');
+        scanBtn.classList.remove('loading', 'error-state');
+      }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Download started successfully.';
       errorEl.style.display = 'none';
       
+      // Auto-reset after a short delay
       setTimeout(() => {
         if (state.status === 'completed') {
           state.status = 'idle';
@@ -449,9 +500,385 @@ function updateUI() {
       extractBtn.textContent = 'Try Again';
       extractBtn.classList.add('error-state');
       extractBtn.classList.remove('loading', 'success');
+      if (scanBtn) {
+        scanBtn.disabled = isRestricted;
+        scanBtn.textContent = 'Try Again';
+        scanBtn.classList.add('error-state');
+        scanBtn.classList.remove('loading', 'success');
+      }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Extraction failed.';
       errorEl.textContent = state.error || 'An unknown error occurred.';
       errorEl.style.display = 'block';
       break;
   }
 }
+
+// Directory scanning logic (User Story 1 & 2)
+async function startDirectoryScan() {
+  if (!state.tabId || state.status === 'extracting' || state.status === 'crawling') return;
+
+  state.status = 'crawling';
+  state.error = null;
+  state.crawler = {
+    urls: [],
+    currentIndex: 0,
+    results: [],
+    abortController: new AbortController()
+  };
+  updateUI();
+
+  try {
+    // 1. Inject libraries (readability & turndown)
+    await chrome.scripting.executeScript({
+      target: { tabId: state.tabId },
+      files: ['lib/readability.js', 'lib/turndown.js']
+    });
+
+    // 2. Inject content.js
+    await chrome.scripting.executeScript({
+      target: { tabId: state.tabId },
+      files: ['content.js']
+    });
+
+    // 3. Request links from tab
+    chrome.tabs.sendMessage(state.tabId, { action: 'extract_links' }, async (response) => {
+      if (chrome.runtime.lastError) {
+        setCrawlerError(chrome.runtime.lastError.message);
+        return;
+      }
+
+      if (!response || !response.success) {
+        setCrawlerError(response ? response.error : 'Failed to extract links from tab.');
+        return;
+      }
+
+      const filteredLinks = parseAndFilterLinks(response.links, state.activeTab.url);
+      if (filteredLinks.length === 0) {
+        setCrawlerError('No same-domain directory pages found to scan.');
+        return;
+      }
+
+      state.crawler.urls = filteredLinks.map(l => l.href);
+      state.crawler.currentIndex = 0;
+      updateUI();
+
+      // Start crawl loop
+      await executeCrawlLoop();
+    });
+  } catch (err) {
+    setCrawlerError('Failed to initialize scan: ' + err.message);
+  }
+}
+
+async function executeCrawlLoop() {
+  const signal = state.crawler.abortController ? state.crawler.abortController.signal : null;
+  const hostname = new URL(state.activeTab.url).hostname.toLowerCase();
+
+  while (state.crawler.currentIndex < state.crawler.urls.length) {
+    if (signal && signal.aborted) {
+      state.status = 'idle';
+      updateUI();
+      return;
+    }
+
+    const url = state.crawler.urls[state.crawler.currentIndex];
+    
+    try {
+      // Fetch the page content
+      const response = await fetch(url, { signal });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const htmlText = await response.text();
+
+      if (signal && signal.aborted) return;
+
+      // Parse HTML
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(htmlText, 'text/html');
+      
+      // Clean HTML DOM
+      cleanHTMLDoc(doc, hostname);
+
+      // Extract Content using Readability
+      const reader = new Readability(doc);
+      const article = reader.parse();
+
+      if (article && article.content) {
+        const turndownService = new TurndownService({ headingStyle: 'atx' });
+        let markdown = turndownService.turndown(article.content);
+        
+        // Hybrid Deduplication logic
+        markdown = deduplicateMarkdown(markdown, state.settings.similarityThreshold);
+
+        state.crawler.results.push({
+          title: article.title || doc.title || 'Untitled',
+          url: url,
+          markdown: markdown
+        });
+      }
+    } catch (err) {
+      console.warn(`Failed to crawl ${url}:`, err);
+      // Skip the failed URL and proceed to the next one
+    }
+
+    state.crawler.currentIndex++;
+    updateUI();
+  }
+
+  // Done crawling, compile and download
+  try {
+    if (state.crawler.results.length === 0) {
+      throw new Error('No pages were successfully extracted.');
+    }
+    if (state.settings.singleFile) {
+      await compileAndDownloadSingleFile(state.crawler.results);
+    } else {
+      await compileAndDownloadZIP(state.crawler.results);
+    }
+    state.status = 'completed';
+    updateUI();
+  } catch (err) {
+    setCrawlerError('Download failed: ' + err.message);
+  }
+}
+
+function cleanHTMLDoc(doc, hostname) {
+  const allElements = doc.querySelectorAll('*');
+  for (const el of allElements) {
+    const style = el.getAttribute('style') || '';
+    if (style.includes('display: none') || style.includes('visibility: hidden')) {
+      el.remove();
+    }
+  }
+
+  if (hostname.includes('wikipedia.org')) {
+    const selectorsToClean = [
+      '#mw-navigation', '#p-navigation', '.mw-portlet',
+      '.mw-editsection', '.infobox', '.navbox', '.catlinks', '.reference'
+    ];
+    for (const selector of selectorsToClean) {
+      const elements = doc.querySelectorAll(selector);
+      for (const el of elements) {
+        el.remove();
+      }
+    }
+  }
+}
+
+async function compileAndDownloadSingleFile(results) {
+  const timestamp = new Date().toISOString();
+  const mainTitle = state.activeTab.title || 'extracted_site';
+  const safeMainTitle = sanitizeFilename(mainTitle);
+  const startingUrl = state.activeTab.url || '';
+
+  const sourcesYaml = results.map(r => `  - ${r.url}`).join('\n');
+  const frontmatter = [
+    '---',
+    `title: ${quoteFrontmatter(mainTitle + ' (Directory Scan)')}`,
+    `url: ${startingUrl}`,
+    `crawled_at: ${timestamp}`,
+    `source_count: ${results.length}`,
+    'sources:',
+    sourcesYaml,
+    '---'
+  ].join('\n');
+
+  const bodySegments = results.map(item => {
+    return `## ${item.title} - ${item.url}\n\n${item.markdown}`;
+  });
+
+  const consolidatedContent = [frontmatter, '', bodySegments.join('\n\n---\n\n')].join('\n');
+
+  await triggerDownload(consolidatedContent, `${safeMainTitle}_crawled.md`, 'text/markdown');
+}
+
+async function compileAndDownloadZIP(results) {
+  if (typeof JSZip === 'undefined') {
+    throw new Error('JSZip library is not loaded.');
+  }
+
+  const zip = new JSZip();
+  const timestamp = new Date().toISOString();
+  const mainTitle = state.activeTab.title || 'extracted_site';
+  const safeMainTitle = sanitizeFilename(mainTitle);
+
+  results.forEach((item, index) => {
+    const fileNum = index + 1;
+    const safeTitle = sanitizeFilename(item.title);
+    
+    const chunkContent = [
+      '---',
+      `title: ${quoteFrontmatter(item.title)}`,
+      `url: ${item.url}`,
+      `extracted_at: ${timestamp}`,
+      `crawled_index: ${fileNum}`,
+      `total_crawled: ${results.length}`,
+      '---',
+      '',
+      item.markdown
+    ].join('\n');
+
+    zip.file(`${safeTitle}.md`, chunkContent);
+  });
+
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const blobUrl = URL.createObjectURL(zipBlob);
+  
+  await chrome.downloads.download({
+    url: blobUrl,
+    filename: `${safeMainTitle}_crawled.zip`,
+    saveAs: true
+  });
+
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+}
+
+function cancelDirectoryScan() {
+  if (state.crawler.abortController) {
+    state.crawler.abortController.abort();
+  }
+  state.status = 'idle';
+  updateUI();
+}
+
+function setCrawlerError(msg) {
+  state.status = 'error';
+  state.error = msg;
+  updateUI();
+}
+
+// Character similarity threshold checking
+function deduplicateMarkdown(markdown, threshold) {
+  const blocks = markdown.split('\n\n');
+  const uniqueBlocks = [];
+
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) {
+      uniqueBlocks.push(block);
+      continue;
+    }
+
+    // Check if this block is similar to any already accepted block
+    let isDuplicate = false;
+    for (const existing of uniqueBlocks) {
+      const existingTrimmed = existing.trim();
+      if (!existingTrimmed) continue;
+
+      if (calculateSimilarity(trimmed, existingTrimmed) > threshold) {
+        isDuplicate = true;
+        break;
+      }
+    }
+
+    if (!isDuplicate) {
+      uniqueBlocks.push(block);
+    }
+  }
+
+  return uniqueBlocks.join('\n\n');
+}
+
+// Calculate similarity (Levenshtein distance normalized by max length)
+function calculateSimilarity(str1, str2) {
+  if (str1 === str2) return 1.0;
+  if (!str1 || !str2) return 0.0;
+
+  // Optimizations for fast exit
+  if (Math.abs(str1.length - str2.length) / Math.max(str1.length, str2.length) > 0.2) {
+    return 0.0; // Length difference is too large to meet 85% similarity
+  }
+
+  const track = Array(str2.length + 1).fill(null).map(() => Array(str1.length + 1).fill(null));
+  for (let i = 0; i <= str1.length; i += 1) track[0][i] = i;
+  for (let j = 0; j <= str2.length; j += 1) track[j][0] = j;
+  for (let j = 1; j <= str2.length; j += 1) {
+    for (let i = 1; i <= str1.length; i += 1) {
+      const indicator = str1[i - 1] === str2[j - 1] ? 0 : 1;
+      track[j][i] = Math.min(
+        track[j][i - 1] + 1, // deletion
+        track[j - 1][i] + 1, // insertion
+        track[j - 1][i - 1] + indicator // substitution
+      );
+    }
+  }
+  const distance = track[str2.length][str1.length];
+  const maxLength = Math.max(str1.length, str2.length);
+  return 1.0 - (distance / maxLength);
+}
+
+// Same-domain path-prefix link filtering utility
+function parseAndFilterLinks(links, currentUrl) {
+  if (!currentUrl || !Array.isArray(links)) return [];
+
+  try {
+    const parsedCurrent = new URL(currentUrl);
+    const origin = parsedCurrent.origin.toLowerCase();
+    const pathname = parsedCurrent.pathname;
+
+    // Determine path prefix (parent directory)
+    let parentPath = '/';
+    const lastSlashIdx = pathname.lastIndexOf('/');
+    if (lastSlashIdx >= 0) {
+      parentPath = pathname.substring(0, lastSlashIdx + 1);
+    }
+
+    const uniqueUrls = new Set();
+    const filteredLinks = [];
+
+    const cleanCurrentStr = currentUrl.replace(/#.*$/, '').replace(/\/$/, '');
+
+    for (const link of links) {
+      if (!link || !link.href) continue;
+
+      try {
+        const linkUrl = new URL(link.href, currentUrl);
+        
+        // Match origin (same protocol, host, port)
+        if (linkUrl.origin.toLowerCase() !== origin) continue;
+
+        // Pathname must start with parentPath prefix
+        if (!linkUrl.pathname.startsWith(parentPath)) continue;
+
+        // Skip non-http/https links
+        if (linkUrl.protocol !== 'http:' && linkUrl.protocol !== 'https:') continue;
+
+        // Clean link (strip hash fragment)
+        linkUrl.hash = '';
+        const cleanLinkStr = linkUrl.toString();
+        const cleanLinkCompare = cleanLinkStr.replace(/\/$/, '');
+
+        // Skip starting page
+        if (cleanLinkCompare === cleanCurrentStr) continue;
+
+        if (!uniqueUrls.has(cleanLinkCompare)) {
+          uniqueUrls.add(cleanLinkCompare);
+          filteredLinks.push({
+            href: cleanLinkStr,
+            text: (link.text || '').trim()
+          });
+        }
+      } catch (e) {
+        // Ignore invalid URLs
+      }
+    }
+
+    return filteredLinks;
+  } catch (err) {
+    console.error('Error filtering links:', err);
+    return [];
+  }
+}
+
+// Export for Vitest and browser usage
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { parseAndFilterLinks };
+} else if (typeof exports !== 'undefined') {
+  exports.parseAndFilterLinks = parseAndFilterLinks;
+} else {
+  window.parseAndFilterLinks = parseAndFilterLinks;
+}
+
+
