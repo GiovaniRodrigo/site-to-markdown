@@ -1,0 +1,106 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ChromeExtensionManifestV3",
+  "type": "object",
+  "required": [
+    "manifest_version",
+    "name",
+    "version",
+    "description",
+    "permissions",
+    "host_permissions",
+    "background",
+    "action",
+    "content_scripts",
+    "icons"
+  ],
+  "properties": {
+    "manifest_version": {
+      "type": "integer",
+      "const": 3
+    },
+    "name": {
+      "type": "string",
+      "const": "Minha Extensão"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["storage", "activeTab", "scripting"]
+      },
+      "uniqueItems": true
+    },
+    "host_permissions": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "const": "<all_urls>"
+      },
+      "uniqueItems": true
+    },
+    "background": {
+      "type": "object",
+      "required": ["service_worker"],
+      "properties": {
+        "service_worker": {
+          "type": "string",
+          "const": "background.js"
+        }
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["default_popup", "default_title"],
+      "properties": {
+        "default_popup": {
+          "type": "string",
+          "const": "popup/popup.html"
+        },
+        "default_title": {
+          "type": "string",
+          "const": "Minha Extensão"
+        }
+      }
+    },
+    "content_scripts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["matches", "js"],
+        "properties": {
+          "matches": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "const": "<all_urls>"
+            }
+          },
+          "js": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "const": "content.js"
+            }
+          }
+        }
+      }
+    },
+    "icons": {
+      "type": "object",
+      "required": ["16", "48", "128"],
+      "properties": {
+        "16": { "type": "string", "const": "icons/icon16.png" },
+        "48": { "type": "string", "const": "icons/icon48.png" },
+        "128": { "type": "string", "const": "icons/icon128.png" }
+      }
+    }
+  }
+}
