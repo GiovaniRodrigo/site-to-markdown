@@ -1,50 +1,57 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+SYNC IMPACT REPORT:
+- Version change: None -> 1.0.0
+- List of modified principles:
+  - [PRINCIPLE_1_NAME] -> I. Clean Extraction (DOM-Based Isolation)
+  - [PRINCIPLE_2_NAME] -> II. Hybrid Deduplication & Ambiguity Resolution
+  - [PRINCIPLE_3_NAME] -> III. LLM-Optimized Output Formatting
+  - [PRINCIPLE_4_NAME] -> IV. Token-Count Splitting & Flexible Packaging
+  - [PRINCIPLE_5_NAME] -> V. User-Controlled Configuration Popup
+- Added sections:
+  - Technical Constraints
+  - Development Workflow
+- Removed sections: None
+- Templates requiring updates:
+  - .specify/templates/plan-template.md (✅ updated)
+  - .specify/templates/spec-template.md (✅ updated)
+  - .specify/templates/tasks-template.md (✅ updated)
+- Follow-up TODOs: None
+-->
+
+# Site-to-Markdown Extension Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Clean Extraction (DOM-Based Isolation)
+The extension MUST isolate the primary page content using Readability.js. Before conversion, the extension MUST prune elements that are hidden (e.g. `display: none`, `visibility: hidden`) or contain navigation noise, scripts, and styling rules to prevent duplicate layout structures (such as desktop vs. mobile header/footer rendering).
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Hybrid Deduplication & Ambiguity Resolution
+The extension MUST filter out repeated or redundant content blocks. It MUST perform duplicate checking on text blocks by combining exact matching and a similarity threshold heuristic (e.g., character match similarity >85%). If a block matches an already extracted block, it MUST be discarded.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. LLM-Optimized Output Formatting
+Extracted markdown MUST be formatted specifically for LLM ingestion. Every generated file MUST contain a structured frontmatter metadata block (including page Title, source URL, date extracted, chunk index, and total chunk count) followed by clean Markdown. Restrict the output to strict markdown format, discarding raw HTML tags or script fragments.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Token-Count Splitting & Flexible Packaging
+The extension MUST support splitting content into multiple files based on a configurable token or character-count limit (e.g., 4000 characters). When splitting is enabled, files MUST be compiled and downloaded as a ZIP archive using JSZip. If disabled, the entire content MUST be downloaded as a single consolidated Markdown file.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. User-Controlled Configuration Popup
+All extraction, splitting, and deduplication settings MUST be configurable via a Browser Action popup UI. This popup MUST provide sliders and toggles for single vs. multi-file mode, character-count threshold, and deduplication/similarity sensitivity, alongside a preview pane showing metadata.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Technical Constraints
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+1. **Client-Side Execution**: The extension MUST run entirely locally in the browser. No external API, proxy, or data gathering servers may be contacted to preserve user privacy and data security.
+2. **Vanilla Stack**: The extension UI and background/content scripts MUST be built using Vanilla HTML, CSS, and JS (Web Extensions API) to remain compile-free, lightweight, and fast.
+3. **Local Bundling**: Any third-party libraries (Readability.js, Turndown.js, JSZip) MUST be packaged locally within the extension directory, rather than loaded from CDNs.
 
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+## Development Workflow
 
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+1. **Structure Integrity**: The extension directory structure MUST follow the standard Web Extensions format (having `manifest.json`, background, content scripts, and popups).
+2. **Quality Gates**: All core components (the extractor, post-processor, and deduplication algorithm) should be modular and tested against a variety of page layouts (blogs, SPAs, documentation).
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+- The Constitution represents the absolute guidelines for development.
+- Any future changes to the core functionalities, tech stack, or rules require an official amendment to this constitution.
+- Bumping the constitution version follows semantic versioning rules: MAJOR for breaking changes, MINOR for new principles/features, and PATCH for typo fixes and clarifications.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-06-04 | **Last Amended**: 2026-06-04

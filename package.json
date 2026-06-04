@@ -1,0 +1,24 @@
+{
+  "name": "site-to-markdown-extension",
+  "version": "1.0.0",
+  "description": "Browser extension to extract page content to markdown",
+  "type": "module",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:dry": "jscpd src",
+    "test:all": "npm run test:dry && npm run test && npm run test:coverage"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  },
+  "devDependencies": {
+    "@mozilla/readability": "^0.5.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "jscpd": "^4.2.4",
+    "jsdom": "^24.1.0",
+    "turndown": "^7.2.0",
+    "vitest": "^1.6.0"
+  }
+}
