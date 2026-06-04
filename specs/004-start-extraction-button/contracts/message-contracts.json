@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ExtractionMessageContracts",
+  "description": "Message schema contract for popup-to-content script communications.",
+  "definitions": {
+    "ExtractionRequest": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["extract_content"]
+        },
+        "settings": {
+          "type": "object",
+          "properties": {
+            "singleFile": { "type": "boolean" },
+            "charLimit": { "type": "integer" },
+            "similarityThreshold": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+          },
+          "required": ["singleFile", "charLimit", "similarityThreshold"]
+        }
+      },
+      "required": ["action", "settings"]
+    },
+    "ExtractionResponse": {
+      "type": "object",
+      "properties": {
+        "success": { "type": "boolean" },
+        "data": {
+          "type": "object",
+          "properties": {
+            "title": { "type": "string" },
+            "url": { "type": "string" },
+            "markdown": { "type": "string" }
+          },
+          "required": ["title", "url", "markdown"]
+        },
+        "error": { "type": "string" }
+      },
+      "required": ["success"]
+    }
+  }
+}

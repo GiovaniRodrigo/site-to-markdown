@@ -2,11 +2,90 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <title>Minha Extensão</title>
+  <title>Site to Markdown</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <h1>Minha Extensão</h1>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-container">
+        <svg class="logo-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        <h1>Site-to-MD</h1>
+      </div>
+      <span class="version-tag">v1.0.0</span>
+    </header>
+
+    <main class="app-content">
+      <!-- Error Banner -->
+      <div id="error-banner" class="error-banner" style="display: none;"></div>
+
+      <!-- Settings Card -->
+      <div class="card settings-card">
+        <h2>Configuration</h2>
+        
+        <!-- Toggle: Single/Multi File Mode -->
+        <div class="form-group row">
+          <label for="mode-toggle" class="form-label">
+            Multi-file (ZIP)
+            <span class="label-desc">Split into chunks</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="mode-toggle">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <!-- Slider: Character Count Limit -->
+        <div class="form-group" id="limit-group">
+          <div class="group-header">
+            <label for="limit-input" class="form-label">Chunk Character Limit</label>
+            <span id="limit-value" class="value-display">4000</span>
+          </div>
+          <input type="range" id="limit-input" min="1000" max="20000" step="500" value="4000">
+        </div>
+
+        <!-- Slider: Deduplication Sensitivity -->
+        <div class="form-group">
+          <div class="group-header">
+            <label for="threshold-input" class="form-label">Deduplication Threshold</label>
+            <span id="threshold-value" class="value-display">85%</span>
+          </div>
+          <input type="range" id="threshold-input" min="0.5" max="1.0" step="0.05" value="0.85">
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="action-container">
+        <div class="btn-group">
+          <button id="extract-btn" class="btn btn-primary">Start Extraction</button>
+        </div>
+        <p id="status-msg" class="status-msg">Ready to extract</p>
+      </div>
+
+      <!-- Metadata Preview Pane -->
+      <div class="card preview-card">
+        <h2>Active Tab Details</h2>
+        <div class="preview-info">
+          <div class="info-row">
+            <span class="info-label">Title:</span>
+            <span id="tab-title-display" class="info-value">Loading...</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">URL:</span>
+            <span id="tab-url-display" class="info-value">Loading...</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="../lib/readability.js"></script>
+  <script src="../lib/turndown.js"></script>
+  <script src="../lib/jszip.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
