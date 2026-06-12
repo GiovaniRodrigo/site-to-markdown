@@ -553,13 +553,20 @@ async function startDirectoryScan() {
         return;
       }
 
-      const filteredLinks = parseAndFilterLinks(response.links, state.activeTab.url);
-      if (filteredLinks.length === 0) {
-        setCrawlerError('No same-domain directory pages found to scan.');
+      const filteredLinks = parseAndFilterLinks(response.links, state.activeTab.url, state.settings.singleFile);
+      
+      // Add current page as starting point (first in the list)
+      const startingPageUrl = state.activeTab.url;
+      state.crawler.urls = [startingPageUrl, ...filteredLinks.map(l => l.href)];
+      
+      // Remove duplicates while preserving order
+      state.crawler.urls = [...new Set(state.crawler.urls)];
+      
+      if (state.crawler.urls.length === 0) {
+        setCrawlerError('No pages found to scan.');
         return;
       }
 
-      state.crawler.urls = filteredLinks.map(l => l.href);
       state.crawler.currentIndex = 0;
       updateUI();
 
@@ -810,12 +817,14 @@ function calculateSimilarity(str1, str2) {
 }
 
 // Same-domain path-prefix link filtering utility
-function parseAndFilterLinks(links, currentUrl) {
+// When allowSubdomains is true, accepts links from any subdomain of the same domain
+function parseAndFilterLinks(links, currentUrl, allowSubdomains = false) {
   if (!currentUrl || !Array.isArray(links)) return [];
 
   try {
     const parsedCurrent = new URL(currentUrl);
     const origin = parsedCurrent.origin.toLowerCase();
+    const hostname = parsedCurrent.hostname.toLowerCase();
     const pathname = parsedCurrent.pathname;
 
     // Determine path prefix (parent directory)
@@ -823,6 +832,13 @@ function parseAndFilterLinks(links, currentUrl) {
     const lastSlashIdx = pathname.lastIndexOf('/');
     if (lastSlashIdx >= 0) {
       parentPath = pathname.substring(0, lastSlashIdx + 1);
+    }
+
+    // Extract base domain (e.g., "example.com" from "api.example.com")
+    const domainParts = hostname.split('.');
+    let baseDomain = hostname;
+    if (domainParts.length > 2) {
+      baseDomain = domainParts.slice(-2).join('.');
     }
 
     const uniqueUrls = new Set();
@@ -835,12 +851,27 @@ function parseAndFilterLinks(links, currentUrl) {
 
       try {
         const linkUrl = new URL(link.href, currentUrl);
+        const linkHostname = linkUrl.hostname.toLowerCase();
         
-        // Match origin (same protocol, host, port)
-        if (linkUrl.origin.toLowerCase() !== origin) continue;
+        // Check domain matching based on allowSubdomains flag
+        let domainMatches = false;
+        if (allowSubdomains) {
+          // Accept any subdomain of the same base domain
+          const linkDomainParts = linkHostname.split('.');
+          let linkBaseDomain = linkHostname;
+          if (linkDomainParts.length > 2) {
+            linkBaseDomain = linkDomainParts.slice(-2).join('.');
+          }
+          domainMatches = linkBaseDomain === baseDomain && linkUrl.protocol === parsedCurrent.protocol;
+        } else {
+          // Strict: match origin (protocol, hostname, port)
+          domainMatches = linkUrl.origin.toLowerCase() === origin;
+        }
 
-        // Pathname must start with parentPath prefix
-        if (!linkUrl.pathname.startsWith(parentPath)) continue;
+        if (!domainMatches) continue;
+
+        // When allowing subdomains, accept any path; otherwise require path prefix match
+        if (!allowSubdomains && !linkUrl.pathname.startsWith(parentPath)) continue;
 
         // Skip non-http/https links
         if (linkUrl.protocol !== 'http:' && linkUrl.protocol !== 'https:') continue;

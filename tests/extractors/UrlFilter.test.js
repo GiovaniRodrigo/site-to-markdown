@@ -50,4 +50,39 @@ describe('parseAndFilterLinks', () => {
     expect(result).toHaveLength(1);
     expect(result[0].href).toBe('https://example.com/docs/valid');
   });
+
+  it('should accept subdomains when allowSubdomains is true', () => {
+    const links = [
+      { href: 'https://api.example.com/v1/docs', text: 'API Docs' },
+      { href: 'https://docs.example.com/intro', text: 'Docs Portal' },
+      { href: 'https://cdn.example.com/static', text: 'CDN' },
+      { href: 'https://other-domain.com/docs/intro', text: 'External' }, // Different domain
+      { href: 'https://example.com/docs/intro', text: 'Self' }, // Self (starting page)
+    ];
+
+    const result = parseAndFilterLinks(links, currentUrl, true);
+
+    // Should accept all example.com subdomains but exclude self and different domain
+    expect(result).toHaveLength(3);
+    expect(result[0].href).toBe('https://api.example.com/v1/docs');
+    expect(result[1].href).toBe('https://docs.example.com/intro');
+    expect(result[2].href).toBe('https://cdn.example.com/static');
+  });
+
+  it('should accept any path when allowSubdomains is true', () => {
+    const links = [
+      { href: 'https://example.com/blog/posts', text: 'Blog' },
+      { href: 'https://example.com/api/v1/docs', text: 'API' },
+      { href: 'https://example.com/about', text: 'About' },
+      { href: 'https://example.com/docs/intro', text: 'Self' }, // Self (starting page)
+    ];
+
+    const result = parseAndFilterLinks(links, currentUrl, true);
+
+    // Should accept all paths from example.com when allowSubdomains is true
+    expect(result).toHaveLength(3);
+    expect(result.some(l => l.href.includes('/blog/posts'))).toBe(true);
+    expect(result.some(l => l.href.includes('/api/v1/docs'))).toBe(true);
+    expect(result.some(l => l.href.includes('/about'))).toBe(true);
+  });
 });
