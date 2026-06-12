@@ -69,9 +69,15 @@ To install and run this extension locally on Chromium-based browsers (Chrome, Ed
    - Set maximum character limits.
    - Configure similarity threshold percentages for deduplication.
    - Toggle between compiling files as a single Markdown file or a ZIP bundle.
-3. **Run Extraction**:
-   - Click **Start Extraction** to download the current active tab as cleaned Markdown.
-   - Click **Scan Directory** to crawl same-domain paths from the current page and download them as a compiled ZIP package.
+3. **LLM API Refinement (Optional)**:
+   - Toggle **Enable LLM Refinement** to activate AI-assisted markdown improvement.
+   - Choose your provider: **Google Gemini**, **OpenAI**, **Anthropic Claude**, or **Ollama (Local)**.
+   - For cloud providers, input your personal API Key (stored securely locally in the browser). For local models, configure Ollama on `http://localhost:11434`.
+   - Toggle **Auto-Refine** to improve markdown automatically on extraction, or use the manual **Improve with LLM** button in the preview pane.
+   - Optionally set a **Refinement Objective** (e.g., "summarize text", "translate to Spanish") to perform prompt-based context alignment (RAG) aligned with your goal.
+4. **Run Extraction**:
+   - Click **Start Extraction** to extract the current tab. If LLM is active, you can preview the original and improved versions side-by-side in the popup before downloading.
+   - Click **Scan Directory** to crawl same-domain paths from the current page.
 
 > [!NOTE]
 > For more details about same-domain path crawling, check the [Crawler Documentation](docs/crawler.md).
@@ -205,9 +211,15 @@ Para instalar e rodar a extensão localmente em navegadores baseados no Chromium
    - Configure o limite de caracteres por arquivo.
    - Ajuste a porcentagem de similaridade para remoção de duplicatas.
    - Escolha o formato de saída (Arquivo Único ou Pacote ZIP).
-3. **Inicie a Extração**:
-   - Clique em **Start Extraction** para baixar a aba atual formatada em Markdown.
-   - Clique em **Scan Directory** para varrer subpáginas do mesmo caminho e exportá-las em um pacote ZIP.
+3. **Melhoria via API de LLM (Opcional)**:
+   - Ative a opção **Enable LLM Refinement** para habilitar melhorias de conteúdo assistidas por IA.
+   - Escolha seu provedor: **Google Gemini**, **OpenAI**, **Anthropic Claude** ou **Ollama (Local)**.
+   - Para provedores em nuvem, insira sua chave de API pessoal (armazenada de forma segura e local no navegador). Para modelos locais, configure o Ollama em `http://localhost:11434`.
+   - Ative o **Auto-Refine** para melhorar o markdown automaticamente ao extrair, ou clique no botão **Improve with LLM** no painel de prévia.
+   - Opcionalmente, defina um **Refinement Objective** (ex: "summarize text", "translate to Portuguese") para aplicar a geração guiada (RAG) conforme seu objetivo.
+4. **Inicie a Extração**:
+   - Clique em **Start Extraction** para extrair a aba atual. Se o LLM estiver ativo, você poderá visualizar as versões original e melhorada lado a lado antes de baixar.
+   - Clique em **Scan Directory** para varrer subpáginas do mesmo caminho.
 
 > [!NOTE]
 > Para obter detalhes adicionais sobre o crawler de caminhos do mesmo domínio, consulte a [Documentação do Crawler (Inglês)](docs/crawler.md).

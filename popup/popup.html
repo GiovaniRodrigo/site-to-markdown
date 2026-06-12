@@ -59,10 +59,85 @@
         </div>
       </div>
 
+      <!-- LLM Configuration Card -->
+      <div class="card settings-card">
+        <div class="form-group row">
+          <label for="llm-toggle" class="form-label">
+            Enable LLM Refinement
+            <span class="label-desc">Refine markdown using AI</span>
+          </label>
+          <label class="switch">
+            <input type="checkbox" id="llm-toggle">
+            <span class="slider round"></span>
+          </label>
+        </div>
+
+        <div id="llm-settings-panel" style="display: none; flex-direction: column; gap: 12px; margin-top: 8px;">
+          <!-- Provider -->
+          <div class="form-group">
+            <label for="llm-provider" class="form-label">AI Provider</label>
+            <select id="llm-provider" class="form-select">
+              <option value="gemini">Google Gemini</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic Claude</option>
+              <option value="ollama">Ollama (Local)</option>
+            </select>
+          </div>
+
+          <!-- API Key -->
+          <div class="form-group" id="api-key-group">
+            <label for="llm-key" class="form-label">API Key</label>
+            <input type="password" id="llm-key" class="form-input" placeholder="Enter API Key">
+          </div>
+
+          <!-- Model Name -->
+          <div class="form-group">
+            <label for="llm-model" class="form-label">Model Name</label>
+            <input type="text" id="llm-model" class="form-input" placeholder="e.g. gemini-1.5-flash">
+          </div>
+
+          <!-- Custom Endpoint -->
+          <div class="form-group" id="endpoint-group">
+            <label for="llm-endpoint" class="form-label">Custom Endpoint URL</label>
+            <input type="text" id="llm-endpoint" class="form-input" placeholder="e.g. http://localhost:11434">
+          </div>
+
+          <!-- Auto-Refine Toggle -->
+          <div class="form-group row">
+            <label for="auto-refine-toggle" class="form-label">
+              Auto-Refine
+              <span class="label-desc">Refine automatically on extract</span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="auto-refine-toggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
+
+          <!-- User Objective -->
+          <div class="form-group">
+            <label for="llm-objective" class="form-label">Refinement Objective (Optional)</label>
+            <textarea id="llm-objective" class="form-textarea" rows="2" placeholder="e.g. Summarize key points, format as tutorial..."></textarea>
+          </div>
+
+          <!-- Connection Test -->
+          <div class="test-connection-container">
+            <button id="test-conn-btn" class="btn btn-secondary btn-sm">Test Connection</button>
+            <span id="test-conn-status" class="test-status"></span>
+          </div>
+
+          <!-- Privacy Warning Callout -->
+          <div id="llm-privacy-warning" class="privacy-warning" style="display: none;">
+            ⚠️ <strong>Privacy Notice:</strong> Sending page content to external AI APIs will transmit website text to third-party servers.
+          </div>
+        </div>
+      </div>
+
       <!-- Actions -->
       <div class="action-container">
         <div class="btn-group">
           <button id="extract-btn" class="btn btn-primary">Start Extraction</button>
+          <button id="improve-btn" class="btn btn-accent" style="display: none;">Improve with LLM</button>
           <button id="scan-btn" class="btn btn-secondary">Scan Directory</button>
           <button id="cancel-btn" class="btn btn-danger" style="display: none;">Cancel</button>
         </div>
@@ -81,6 +156,21 @@
             <span class="info-label">URL:</span>
             <span id="tab-url-display" class="info-value">Loading...</span>
           </div>
+        </div>
+      </div>
+
+      <!-- Content Preview Card (US3) -->
+      <div id="content-preview-card" class="card preview-card" style="display: none;">
+        <h2>Extracted Markdown Preview</h2>
+        <div class="tab-header">
+          <button id="tab-original" class="tab-btn active">Original</button>
+          <button id="tab-improved" class="tab-btn" style="display: none;">LLM Improved</button>
+        </div>
+        <div class="preview-content-container">
+          <pre id="preview-text-box"></pre>
+        </div>
+        <div class="preview-actions">
+          <button id="download-preview-btn" class="btn btn-primary">Download Markdown</button>
         </div>
       </div>
     </main>

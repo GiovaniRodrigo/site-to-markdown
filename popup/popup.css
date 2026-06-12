@@ -387,3 +387,132 @@ input:checked + .slider:before {
 @keyframes spinner {
   to { transform: rotate(360deg); }
 }
+
+/* LLM Configurations & Inputs styling */
+.form-select, .form-input, .form-textarea {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-accent);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-family: var(--font-family);
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.form-select:focus, .form-input:focus, .form-textarea:focus {
+  border-color: var(--primary-color);
+}
+
+.form-textarea {
+  resize: vertical;
+}
+
+.test-connection-container {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.test-status {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.test-status.success {
+  color: var(--success-color);
+}
+
+.test-status.error {
+  color: var(--error-color);
+}
+
+.privacy-warning {
+  background-color: #3b2314;
+  border: 1px solid #d97706;
+  color: #fcd34d;
+  font-size: 11px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  line-height: 1.4;
+  margin-top: 8px;
+}
+
+.btn-accent {
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: var(--text-primary);
+  box-shadow: 0 4px 10px rgba(139, 92, 246, 0.3);
+}
+
+.btn-accent:hover:not(:disabled) {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  transform: translateY(-1px);
+}
+
+.btn-accent:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+  width: auto;
+}
+
+/* Tab buttons for US3 */
+.tab-header {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--bg-accent);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-accent);
+}
+
+.tab-btn.active {
+  color: var(--text-primary);
+  background-color: var(--primary-color);
+}
+
+.preview-content-container {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--bg-accent);
+  border-radius: 6px;
+  padding: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+#preview-text-box {
+  margin: 0;
+  font-family: monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.preview-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}

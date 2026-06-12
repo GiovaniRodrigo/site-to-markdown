@@ -1,20 +1,31 @@
 // State object matching the ExtractionJob data model
 const state = {
   tabId: null,
-  status: 'idle', // 'idle' | 'extracting' | 'completed' | 'error' | 'crawling'
+  status: 'idle', // 'idle' | 'extracting' | 'completed' | 'error' | 'crawling' | 'refining'
   error: null,
   activeTab: null,
   settings: {
     singleFile: true,
     charLimit: 4000,
-    similarityThreshold: 0.85
+    similarityThreshold: 0.85,
+    llmEnabled: false,
+    llmProvider: 'gemini',
+    llmApiKey: '',
+    llmModel: 'gemini-1.5-flash',
+    llmCustomEndpoint: '',
+    llmAutoRefine: false,
+    llmPromptTemplate: '',
+    llmObjective: ''
   },
   crawler: {
     urls: [],
     currentIndex: 0,
     results: [],
     abortController: null
-  }
+  },
+  rawMarkdown: '',
+  improvedMarkdown: '',
+  currentExtractionData: null
 };
 
 // UI Element references
@@ -31,6 +42,29 @@ let limitValue;
 let thresholdInput;
 let thresholdValue;
 let limitGroup;
+
+// LLM Element references
+let llmToggle;
+let llmSettingsPanel;
+let llmProviderSelect;
+let llmKeyInput;
+let llmModelInput;
+let llmEndpointInput;
+let llmAutoRefineToggle;
+let llmObjectiveInput;
+let testConnBtn;
+let testConnStatus;
+let llmPrivacyWarning;
+let apiKeyGroup;
+let endpointGroup;
+let improveBtn;
+
+// Preview Tab references
+let contentPreviewCard;
+let tabOriginal;
+let tabImproved;
+let previewTextBox;
+let downloadPreviewBtn;
 
 // Initialize when popup loads
 document.addEventListener('DOMContentLoaded', async () => {
@@ -49,13 +83,49 @@ document.addEventListener('DOMContentLoaded', async () => {
   thresholdValue = document.getElementById('threshold-value');
   limitGroup = document.getElementById('limit-group');
 
+  // Select LLM DOM Elements
+  llmToggle = document.getElementById('llm-toggle');
+  llmSettingsPanel = document.getElementById('llm-settings-panel');
+  llmProviderSelect = document.getElementById('llm-provider');
+  llmKeyInput = document.getElementById('llm-key');
+  llmModelInput = document.getElementById('llm-model');
+  llmEndpointInput = document.getElementById('llm-endpoint');
+  llmAutoRefineToggle = document.getElementById('auto-refine-toggle');
+  llmObjectiveInput = document.getElementById('llm-objective');
+  testConnBtn = document.getElementById('test-conn-btn');
+  testConnStatus = document.getElementById('test-conn-status');
+  llmPrivacyWarning = document.getElementById('llm-privacy-warning');
+  apiKeyGroup = document.getElementById('api-key-group');
+  endpointGroup = document.getElementById('endpoint-group');
+  improveBtn = document.getElementById('improve-btn');
+
+  // Preview elements (US3)
+  contentPreviewCard = document.getElementById('content-preview-card');
+  tabOriginal = document.getElementById('tab-original');
+  tabImproved = document.getElementById('tab-improved');
+  previewTextBox = document.getElementById('preview-text-box');
+  downloadPreviewBtn = document.getElementById('download-preview-btn');
+
   // Load settings from storage
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(['singleFile', 'charLimit', 'similarityThreshold'], (items) => {
+    chrome.storage.local.get([
+      'singleFile', 'charLimit', 'similarityThreshold',
+      'llmEnabled', 'llmProvider', 'llmApiKey', 'llmModel',
+      'llmCustomEndpoint', 'llmAutoRefine', 'llmPromptTemplate', 'llmObjective'
+    ], (items) => {
       state.settings.singleFile = items.singleFile !== undefined ? items.singleFile : true;
       state.settings.charLimit = items.charLimit !== undefined ? items.charLimit : 4000;
       state.settings.similarityThreshold = items.similarityThreshold !== undefined ? items.similarityThreshold : 0.85;
       
+      state.settings.llmEnabled = items.llmEnabled !== undefined ? items.llmEnabled : false;
+      state.settings.llmProvider = items.llmProvider !== undefined ? items.llmProvider : 'gemini';
+      state.settings.llmApiKey = items.llmApiKey !== undefined ? items.llmApiKey : '';
+      state.settings.llmModel = items.llmModel !== undefined ? items.llmModel : 'gemini-1.5-flash';
+      state.settings.llmCustomEndpoint = items.llmCustomEndpoint !== undefined ? items.llmCustomEndpoint : '';
+      state.settings.llmAutoRefine = items.llmAutoRefine !== undefined ? items.llmAutoRefine : false;
+      state.settings.llmPromptTemplate = items.llmPromptTemplate !== undefined ? items.llmPromptTemplate : '';
+      state.settings.llmObjective = items.llmObjective !== undefined ? items.llmObjective : '';
+
       updateSettingsUI();
     });
   }
@@ -83,6 +153,101 @@ document.addEventListener('DOMContentLoaded', async () => {
       if (thresholdValue) thresholdValue.textContent = Math.round(state.settings.similarityThreshold * 100) + '%';
       saveSettings();
     });
+  }
+
+  if (llmToggle) {
+    llmToggle.addEventListener('change', (e) => {
+      state.settings.llmEnabled = e.target.checked;
+      saveSettings();
+      toggleLLMSettingsPanel();
+      updateUI();
+    });
+  }
+
+  if (llmProviderSelect) {
+    llmProviderSelect.addEventListener('change', (e) => {
+      state.settings.llmProvider = e.target.value;
+      
+      // Update default model name based on provider
+      if (state.settings.llmProvider === 'gemini') {
+        state.settings.llmModel = 'gemini-1.5-flash';
+      } else if (state.settings.llmProvider === 'openai') {
+        state.settings.llmModel = 'gpt-4o-mini';
+      } else if (state.settings.llmProvider === 'anthropic') {
+        state.settings.llmModel = 'claude-3-5-sonnet-20240620';
+      } else if (state.settings.llmProvider === 'ollama') {
+        state.settings.llmModel = 'llama3';
+      }
+      
+      if (llmModelInput) llmModelInput.value = state.settings.llmModel;
+
+      saveSettings();
+      toggleProviderGroups();
+    });
+  }
+
+  if (llmKeyInput) {
+    llmKeyInput.addEventListener('input', (e) => {
+      state.settings.llmApiKey = e.target.value;
+      saveSettings();
+    });
+  }
+
+  if (llmModelInput) {
+    llmModelInput.addEventListener('input', (e) => {
+      state.settings.llmModel = e.target.value;
+      saveSettings();
+    });
+  }
+
+  if (llmEndpointInput) {
+    llmEndpointInput.addEventListener('input', (e) => {
+      state.settings.llmCustomEndpoint = e.target.value;
+      saveSettings();
+    });
+  }
+
+  if (llmAutoRefineToggle) {
+    llmAutoRefineToggle.addEventListener('change', (e) => {
+      state.settings.llmAutoRefine = e.target.checked;
+      saveSettings();
+    });
+  }
+
+  if (llmObjectiveInput) {
+    llmObjectiveInput.addEventListener('input', (e) => {
+      state.settings.llmObjective = e.target.value;
+      saveSettings();
+    });
+  }
+
+  if (testConnBtn) {
+    testConnBtn.addEventListener('click', runConnectionTest);
+  }
+
+  if (improveBtn) {
+    improveBtn.addEventListener('click', startLlmRefinement);
+  }
+
+  // Preview tab event listeners (US3)
+  if (tabOriginal) {
+    tabOriginal.addEventListener('click', () => {
+      tabOriginal.classList.add('active');
+      if (tabImproved) tabImproved.classList.remove('active');
+      if (previewTextBox) previewTextBox.textContent = state.rawMarkdown;
+    });
+  }
+
+  if (tabImproved) {
+    tabImproved.addEventListener('click', () => {
+      tabImproved.classList.add('active');
+      if (tabOriginal) tabOriginal.classList.remove('active');
+      if (previewTextBox) previewTextBox.textContent = state.improvedMarkdown;
+    });
+  }
+
+  if (downloadPreviewBtn) {
+    downloadPreviewBtn.addEventListener('click', downloadActivePreview);
   }
 
   if (extractBtn) {
@@ -113,12 +278,42 @@ function updateSettingsUI() {
     thresholdInput.value = state.settings.similarityThreshold;
     if (thresholdValue) thresholdValue.textContent = Math.round(state.settings.similarityThreshold * 100) + '%';
   }
+  
+  if (llmToggle) llmToggle.checked = state.settings.llmEnabled;
+  if (llmProviderSelect) llmProviderSelect.value = state.settings.llmProvider;
+  if (llmKeyInput) llmKeyInput.value = state.settings.llmApiKey;
+  if (llmModelInput) llmModelInput.value = state.settings.llmModel;
+  if (llmEndpointInput) llmEndpointInput.value = state.settings.llmCustomEndpoint;
+  if (llmAutoRefineToggle) llmAutoRefineToggle.checked = state.settings.llmAutoRefine;
+  if (llmObjectiveInput) llmObjectiveInput.value = state.settings.llmObjective;
+
   toggleLimitGroup();
+  toggleLLMSettingsPanel();
+  toggleProviderGroups();
 }
 
 function toggleLimitGroup() {
   if (limitGroup) {
     limitGroup.style.display = state.settings.singleFile ? 'none' : 'flex';
+  }
+}
+
+function toggleLLMSettingsPanel() {
+  if (llmSettingsPanel) {
+    llmSettingsPanel.style.display = state.settings.llmEnabled ? 'flex' : 'none';
+  }
+}
+
+function toggleProviderGroups() {
+  const provider = state.settings.llmProvider;
+  if (apiKeyGroup) {
+    apiKeyGroup.style.display = provider === 'ollama' ? 'none' : 'flex';
+  }
+  if (endpointGroup) {
+    endpointGroup.style.display = provider === 'ollama' ? 'flex' : 'none';
+  }
+  if (llmPrivacyWarning) {
+    llmPrivacyWarning.style.display = provider === 'ollama' ? 'none' : 'block';
   }
 }
 
@@ -128,9 +323,52 @@ function saveSettings() {
     chrome.storage.local.set({
       singleFile: state.settings.singleFile,
       charLimit: state.settings.charLimit,
-      similarityThreshold: state.settings.similarityThreshold
+      similarityThreshold: state.settings.similarityThreshold,
+      llmEnabled: state.settings.llmEnabled,
+      llmProvider: state.settings.llmProvider,
+      llmApiKey: state.settings.llmApiKey,
+      llmModel: state.settings.llmModel,
+      llmCustomEndpoint: state.settings.llmCustomEndpoint,
+      llmAutoRefine: state.settings.llmAutoRefine,
+      llmPromptTemplate: state.settings.llmPromptTemplate,
+      llmObjective: state.settings.llmObjective
     });
   }
+}
+
+// Ping target LLM Connection
+async function runConnectionTest() {
+  if (!testConnBtn || !testConnStatus) return;
+
+  testConnStatus.textContent = 'Testing...';
+  testConnStatus.className = 'test-status';
+  testConnBtn.disabled = true;
+
+  chrome.runtime.sendMessage({
+    action: 'testLLMConnection',
+    config: {
+      llmProvider: state.settings.llmProvider,
+      llmApiKey: state.settings.llmApiKey,
+      llmModel: state.settings.llmModel,
+      llmCustomEndpoint: state.settings.llmCustomEndpoint
+    }
+  }, (response) => {
+    testConnBtn.disabled = false;
+    if (chrome.runtime.lastError) {
+      testConnStatus.textContent = '❌ Error: ' + chrome.runtime.lastError.message;
+      testConnStatus.classList.add('error');
+      return;
+    }
+
+    if (response && response.success) {
+      testConnStatus.textContent = '✓ Connected!';
+      testConnStatus.classList.add('success');
+    } else {
+      const err = response ? response.error : 'Connection failed';
+      testConnStatus.textContent = '❌ ' + err;
+      testConnStatus.classList.add('error');
+    }
+  });
 }
 
 // Verify if active tab can be extracted
@@ -224,11 +462,40 @@ async function startExtraction() {
       }
 
       try {
-        await processAndDownload(response.data);
-        state.status = 'completed';
-        updateUI();
+        state.currentExtractionData = response.data;
+        state.rawMarkdown = response.data.markdown;
+        state.improvedMarkdown = '';
+
+        if (state.settings.llmEnabled) {
+          state.status = 'idle';
+          updateUI();
+          
+          // Display the preview block containing raw extraction
+          if (contentPreviewCard) contentPreviewCard.style.display = 'block';
+          if (previewTextBox) previewTextBox.textContent = state.rawMarkdown;
+          if (tabOriginal) {
+            tabOriginal.classList.add('active');
+            tabOriginal.style.display = 'inline-block';
+          }
+          if (tabImproved) {
+            tabImproved.classList.remove('active');
+            tabImproved.style.display = 'none'; // Only show when improved markdown exists
+          }
+
+          if (state.settings.llmAutoRefine) {
+            // Trigger automatic refinement
+            await startLlmRefinement();
+          } else {
+            statusEl.textContent = 'Extraction complete. Ready for LLM improvement.';
+          }
+        } else {
+          // LLM disabled - proceed directly to original download
+          await processAndDownload(response.data);
+          state.status = 'completed';
+          updateUI();
+        }
       } catch (downloadErr) {
-        setErrorState('Download error: ' + downloadErr.message);
+        setErrorState('Error: ' + downloadErr.message);
       }
     });
 
@@ -409,7 +676,6 @@ function sanitizeFilename(name) {
     .replace(/\s+/g, '_')          // Replace spaces with underscores
     .substring(0, 80);            // Limit length
 }
-
 // Quote strings with quotes or colons for safe YAML frontmatter
 function quoteFrontmatter(str) {
   const escaped = str.replace(/"/g, '\\"');
@@ -429,6 +695,15 @@ function updateUI() {
     state.activeTab.url.startsWith('chromewebstore.google.com')
   );
 
+  // Show improve button if LLM is enabled, we have raw markdown, and we are not currently extracting/refining/crawling
+  if (improveBtn) {
+    const canImprove = state.settings.llmEnabled && 
+                       state.rawMarkdown && 
+                       state.status === 'idle' && 
+                       !state.improvedMarkdown;
+    improveBtn.style.display = canImprove ? 'inline-block' : 'none';
+  }
+
   switch (state.status) {
     case 'idle':
       extractBtn.disabled = isRestricted;
@@ -439,8 +714,13 @@ function updateUI() {
         scanBtn.textContent = 'Scan Directory';
         scanBtn.classList.remove('loading', 'success', 'error-state');
       }
+      if (improveBtn) {
+        improveBtn.disabled = false;
+        improveBtn.textContent = 'Improve with LLM';
+        improveBtn.classList.remove('loading', 'success', 'error-state');
+      }
       if (cancelBtn) cancelBtn.style.display = 'none';
-      statusEl.textContent = 'Ready to extract';
+      statusEl.textContent = state.rawMarkdown ? 'Extraction complete.' : 'Ready to extract';
       errorEl.style.display = 'none';
       break;
 
@@ -449,9 +729,22 @@ function updateUI() {
       extractBtn.textContent = 'Extracting...';
       extractBtn.classList.add('loading');
       extractBtn.classList.remove('success', 'error-state');
-      if (scanBtn) scanBtn.disabled = true;
+      if (scanBtn) {
+        scanBtn.disabled = true;
+      }
       if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Parsing page content...';
+      errorEl.style.display = 'none';
+      break;
+
+    case 'refining':
+      extractBtn.disabled = true;
+      if (improveBtn) {
+        improveBtn.disabled = true;
+        improveBtn.textContent = 'Refining...';
+        improveBtn.classList.add('loading');
+      }
+      statusEl.textContent = 'Refining markdown with LLM...';
       errorEl.style.display = 'none';
       break;
 
@@ -482,6 +775,12 @@ function updateUI() {
         scanBtn.classList.add('success');
         scanBtn.classList.remove('loading', 'error-state');
       }
+      if (improveBtn) {
+        improveBtn.disabled = isRestricted;
+        improveBtn.textContent = 'Success!';
+        improveBtn.classList.add('success');
+        improveBtn.classList.remove('loading', 'error-state');
+      }
       if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Download started successfully.';
       errorEl.style.display = 'none';
@@ -505,6 +804,12 @@ function updateUI() {
         scanBtn.textContent = 'Try Again';
         scanBtn.classList.add('error-state');
         scanBtn.classList.remove('loading', 'success');
+      }
+      if (improveBtn) {
+        improveBtn.disabled = isRestricted;
+        improveBtn.textContent = 'Try Again';
+        improveBtn.classList.add('error-state');
+        improveBtn.classList.remove('loading', 'success');
       }
       if (cancelBtn) cancelBtn.style.display = 'none';
       statusEl.textContent = 'Extraction failed.';
@@ -935,6 +1240,88 @@ if (typeof module !== 'undefined' && module.exports) {
   exports.parseAndFilterLinks = parseAndFilterLinks;
 } else {
   window.parseAndFilterLinks = parseAndFilterLinks;
+}
+
+// LLM Refinement Logic (US2)
+async function startLlmRefinement() {
+  if (!state.rawMarkdown || state.status === 'refining') return;
+
+  // Check character limits warning (T017)
+  const wordCount = state.rawMarkdown.length;
+  if (wordCount > 30000) {
+    const proceed = confirm(`⚠️ Large Content Warning: Extracted text is quite large (${wordCount} characters). Sending this to the LLM may exceed context limits or result in higher latency. Do you want to proceed?`);
+    if (!proceed) {
+      statusEl.textContent = 'LLM Refinement skipped by user.';
+      return;
+    }
+  }
+
+  state.status = 'refining';
+  updateUI();
+
+  chrome.runtime.sendMessage({
+    action: 'improveMarkdown',
+    config: {
+      llmProvider: state.settings.llmProvider,
+      llmApiKey: state.settings.llmApiKey,
+      llmModel: state.settings.llmModel,
+      llmCustomEndpoint: state.settings.llmCustomEndpoint,
+      llmPromptTemplate: state.settings.llmPromptTemplate,
+      llmObjective: state.settings.llmObjective
+    },
+    content: state.rawMarkdown
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      state.status = 'idle';
+      updateUI();
+      setErrorState('LLM Error: ' + chrome.runtime.lastError.message);
+      return;
+    }
+
+    if (response && response.success) {
+      state.improvedMarkdown = response.improvedMarkdown;
+      state.status = 'idle';
+      updateUI();
+
+      statusEl.textContent = 'LLM Refinement complete!';
+      
+      // Update preview card UI to show "Improved" tab (US3)
+      if (tabImproved) {
+        tabImproved.style.display = 'inline-block';
+        tabImproved.click(); // Switch view to improved text
+      }
+    } else {
+      state.status = 'idle';
+      updateUI();
+      const err = response ? response.error : 'Refinement failed';
+      setErrorState('LLM Error: ' + err + '. Falling back to original markdown.');
+      
+      // Select original tab in preview on error fallback (T018)
+      if (tabOriginal) tabOriginal.click();
+    }
+  });
+}
+
+// Download Selected Preview (US3)
+async function downloadActivePreview() {
+  if (!state.currentExtractionData) return;
+
+  const isActiveImproved = tabImproved && tabImproved.classList.contains('active');
+  const markdownToDownload = isActiveImproved ? state.improvedMarkdown : state.rawMarkdown;
+
+  const downloadData = {
+    title: state.currentExtractionData.title,
+    url: state.currentExtractionData.url,
+    markdown: markdownToDownload
+  };
+
+  try {
+    await processAndDownload(downloadData);
+    state.status = 'completed';
+    updateUI();
+  } catch (err) {
+    setErrorState('Download failed: ' + err.message);
+  }
 }
 
 

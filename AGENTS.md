@@ -1,6 +1,6 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/007-setup-readme/plan.md
+at specs/008-llm-api-integration/plan.md
 <!-- SPECKIT END -->
 
