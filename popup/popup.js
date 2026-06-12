@@ -541,37 +541,62 @@ async function startDirectoryScan() {
       files: ['content.js']
     });
 
-    // 3. Request links from tab
-    chrome.tabs.sendMessage(state.tabId, { action: 'extract_links' }, async (response) => {
+    // 3. Request links and extract content from current page in parallel
+    chrome.tabs.sendMessage(state.tabId, { action: 'extract_links' }, (linksResponse) => {
       if (chrome.runtime.lastError) {
         setCrawlerError(chrome.runtime.lastError.message);
         return;
       }
 
-      if (!response || !response.success) {
-        setCrawlerError(response ? response.error : 'Failed to extract links from tab.');
+      if (!linksResponse || !linksResponse.success) {
+        setCrawlerError(linksResponse ? linksResponse.error : 'Failed to extract links from tab.');
         return;
       }
 
-      const filteredLinks = parseAndFilterLinks(response.links, state.activeTab.url, state.settings.singleFile);
-      
-      // Add current page as starting point (first in the list)
-      const startingPageUrl = state.activeTab.url;
-      state.crawler.urls = [startingPageUrl, ...filteredLinks.map(l => l.href)];
-      
-      // Remove duplicates while preserving order
-      state.crawler.urls = [...new Set(state.crawler.urls)];
-      
-      if (state.crawler.urls.length === 0) {
-        setCrawlerError('No pages found to scan.');
-        return;
-      }
+      chrome.tabs.sendMessage(state.tabId, {
+        action: 'extract_content',
+        settings: {
+          similarityThreshold: state.settings.similarityThreshold
+        }
+      }, async (contentResponse) => {
+        if (chrome.runtime.lastError) {
+          setCrawlerError(chrome.runtime.lastError.message);
+          return;
+        }
 
-      state.crawler.currentIndex = 0;
-      updateUI();
+        if (!contentResponse || !contentResponse.success) {
+          setCrawlerError(contentResponse ? contentResponse.error : 'Failed to extract current page content.');
+          return;
+        }
 
-      // Start crawl loop
-      await executeCrawlLoop();
+        // Filter links: pass false for allowSubdomains (not singleFile)
+        const filteredLinks = parseAndFilterLinks(linksResponse.links, state.activeTab.url, false);
+
+        if (filteredLinks.length === 0) {
+          setCrawlerError('No same-domain directory links found on this page.');
+          return;
+        }
+
+        // Set URLs to crawl (excluding current page as filteredLinks already excludes currentUrl)
+        state.crawler.urls = filteredLinks.map(l => l.href);
+
+        // Remove duplicates while preserving order
+        state.crawler.urls = [...new Set(state.crawler.urls)];
+
+        // Prepopulate results with the current page's content that we just extracted directly from the active tab's DOM
+        const startingPageUrl = state.activeTab.url;
+        state.crawler.results = [{
+          title: contentResponse.data.title || state.activeTab.title || 'Untitled',
+          url: contentResponse.data.url || startingPageUrl,
+          markdown: contentResponse.data.markdown
+        }];
+
+        state.crawler.currentIndex = 0;
+        updateUI();
+
+        // Start crawl loop
+        await executeCrawlLoop();
+      });
     });
   } catch (err) {
     setCrawlerError('Failed to initialize scan: ' + err.message);
